@@ -61,6 +61,38 @@ class UsageAnalyticsService:
         )
         return grouped
 
+    def get_raw_data(self, start_date: str | None = None, end_date: str | None = None, user: str | None = None, model: str | None = None) -> pd.DataFrame:
+        """Return raw usage data with optional filtering by date range, user, and model."""
+        
+        dataframe = self._load_dataframe()
+        if dataframe.empty:
+            return pd.DataFrame(columns=self._dataframe_columns())
+        
+        # Apply date filtering if provided
+        if start_date:
+            start_dt = pd.to_datetime(start_date, utc=True)
+            dataframe = dataframe[dataframe["date"] >= start_dt]
+        
+        if end_date:
+            # If end_date is just a date (no time), set it to end of day
+            end_dt = pd.to_datetime(end_date, utc=True)
+            if end_dt.time() == pd.Timestamp("00:00:00").time():
+                end_dt = end_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+            dataframe = dataframe[dataframe["date"] <= end_dt]
+        
+        # Apply user filtering if provided
+        if user:
+            dataframe = dataframe[dataframe["user"] == user]
+        
+        # Apply model filtering if provided
+        if model:
+            dataframe = dataframe[dataframe["model"] == model]
+        
+        # Sort by date descending (newest first)
+        dataframe = dataframe.sort_values("date", ascending=False, ignore_index=True)
+        
+        return dataframe
+
     def _load_dataframe(self) -> pd.DataFrame:
         events = self._repository.get_events()
         if not events:
